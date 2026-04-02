@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mr & Mrs X — Wealth Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js">
+// === ISA HOLDINGS LIST ===
+const isaHoldingsFull = [
+  {name:'Jupiter Global Value X',val:6378,gl:1349,glp:26.84,col:'#4f8ef7'},
+  {name:'UBS S&P 500 Index C',val:7708,gl:978,glp:14.54,col:'#4f8ef7'},
+  {name:'Jupiter UK Income U1',val:5523,gl:1806,glp:48.60,col:'#2dd4bf'},
+  {name:'L&G International Index C',val:4763,gl:1064,glp:28.77,col:'#4f8ef7'},
+  {name:'L&G US Index C',val:4600,gl:1072,glp:30.39,col:'#4f8ef7'},
+  {name:'L&G UK Index C',val:4133,gl:1047,glp:33.94,col:'#2dd4bf'},
+  {name:'Fidelity Global Technology W',val:3292,gl:872,glp:36.02,col:'#a78bfa'},
+  {name:'Jupiter India X',val:3111,gl:-40,glp:-1.27,col:'#f5a623'},
+  {name:'Fundsmith Equity I',val:2704,gl:-184,glp:-6.38,col:'#7a8099'},
+  {name:'Artemis High Income I',val:2663,gl:417,glp:18.54,col:'#34d17a'},
+  {name:'BlackRock Japan Flexible D4',val:2232,gl:113,glp:5.33,col:'#4f8ef7'},
+  {name:'Royal London ST Money Mkt Y',val:2101,gl:163,glp:8.39,col:'#7a8099'},
+  {name:'iShares Automation & Robotics',val:1413,gl:176,glp:14.22,col:'#f5a623'},
+  {name:'BlackRock Abs Return Bond D',val:1545,gl:131,glp:9.26,col:'#7a8099'},
+  {name:'iShares Physical Gold ETC',val:1293,gl:-63,glp:-4.64,col:'#f5a623'},
+  {name:'Vanguard FTSE Emerging Mkts',val:839,gl:124,glp:17.35,col:'#2dd4bf'},
+  {name:'CT Private Equity Trust',val:619,gl:186,glp:42.89,col:'#a78bfa'},
+  {name:'iShares Physical Palladium ETC',val:449,gl:-261,glp:-36.76,col:'#f25c5c'},
+  {name:'Cash (ISA)',val:969,gl:0,glp:0,col:'#7a8099'}
+];
+const isaTotal = 56334;
+
+function renderISAHoldings(){
+  const el = document.getElementById('isaHoldingsList');
+  const sorted = [...isaHoldingsFull].sort((a,b)=>b.val-a.val);
+  el.innerHTML = sorted.map(h=>{
+    const pct = (h.val/isaTotal*100).toFixed(1);
+    const bw = Math.min(parseFloat(pct)*2,100);
+    const glCol = h.gl>0?'var(--grn)':h.gl<0?'var(--red)':'var(--t3)';
+    const glStr = (h.gl>=0?'+':'')+fmtK(h.gl);
+    const glpStr = (h.glp>=0?'+':'')+h.glp.toFixed(1)+'%';
+    return \`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--bd);font-size:12px">
+      <div style="flex:1;color:var(--t1)">\${h.name}</div>
+      <div style="width:72px;text-align:right;font-variant-numeric:tabular-nums">\${fmtK(h.val)}</div>
+      <div style="width:56px;text-align:right;color:\${glCol};font-size:11px">\${glpStr}</div>
+      <div style="width:44px;text-align:right;color:var(--t3);font-size:11px">\${pct}%</div>
+      <div style="width:90px;height:4px;background:var(--s3);border-radius:2px;flex-shrink:0">
+        <div style="width:\${bw}%;height:4px;border-radius:2px;background:\${h.col}"></div>
+      </div>
+    </div>\`;
+  }).join('');
+}
+renderISAHoldings();
+
+// === ISA BALANCE TRACKER ===
+let isaHistory = JSON.parse(localStorage.getItem('isaHistory') || 'null') || [
+  {m:'Apr 26', v:56334}
+];
+
+let isaTrackChart = null;
+
+function renderISAChart(){
+  const labels = isaHistory.map(d=>d.m);
+  const vals = isaHistory.map(d=>d.v);
+  const pcts = vals.map((v,i)=> i===0 ? 0 : parseFloat(((v-vals[i-1])/vals[i-1]*100).toFixed(2)));
+
+  if(isaTrackChart) isaTrackChart.destroy();
+  isaTrackChart = new Chart(document.getElementById('isaTrack'),{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'ISA Value',data:vals,backgroundColor:'rgba(79,142,247,0.25)',borderColor:'#4f8ef7',borderWidth:1.5,borderRadius:4,yAxisID:'y',order:2},
+        {label:'% Change',data:pcts,type:'line',borderColor:'#34d17a',backgroundColor:'transparent',borderWidth:2,pointRadius:4,pointBackgroundColor:pcts.map(p=>p>=0?'#34d17a':'#f25c5c'),tension:.3,yAxisID:'y1',order:1}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{
+        label:ctx=> ctx.datasetIndex===0 ? ' £'+ctx.raw.toLocaleString('en-GB') : ' '+(ctx.raw>=0?'+':'')+ctx.raw+'%'
+      }}},
+      scales:{
+        x:{grid:{color:GC},ticks:{color:TC,autoSkip:false,maxRotation:0,font:{size:11}}},
+        y:{grid:{color:GC},ticks:{color:TC,callback:v=>'£'+(v/1000).toFixed(0)+'k'},position:'left'},
+        y1:{grid:{display:false},ticks:{color:TC,callback:v=>(v>=0?'+':'')+v+'%'},position:'right'}
+      }
+    }
+  });
+}
+renderISAChart();
+
+function addISAMonth(){
+  document.getElementById('isaMonthForm').style.display='block';
+  const now = new Date();
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('isa-month-inp').value = months[now.getMonth()]+' '+(now.getFullYear()+'').slice(2);
+}
+
+function saveISAMonth(){
+  const m = document.getElementById('isa-month-inp').value.trim();
+  const v = parseFloat(document.getElementById('isa-val-inp').value);
+  if(!m||isNaN(v)) return;
+  isaHistory.push({m,v});
+  localStorage.setItem('isaHistory', JSON.stringify(isaHistory));
+  document.getElementById('isaMonthForm').style.display='none';
+  renderISAChart();
+}
+
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0c0f1a;--s1:#131726;--s2:#1a1f30;--s3:#222840;
+  --bd:rgba(255,255,255,0.07);--bd2:rgba(255,255,255,0.13);
+  --t1:#e8eaf0;--t2:#9aa0b8;--t3:#5c6280;
+  --acc:#4f8ef7;--grn:#34d17a;--amb:#f5a623;--red:#f25c5c;--pur:#a78bfa;--teal:#2dd4bf;--pink:#f472b6;
+  --font:'DM Sans',system-ui,sans-serif;--mono:'DM Mono',monospace;
+  --r:14px;--rs:8px
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t1);font-family:var(--font);font-size:14px;line-height:1.6;min-height:100vh}
+.dash{max-width:1020px;margin:0 auto;padding:28px 20px 80px}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;padding-bottom:16px;border-bottom:1px solid var(--bd)}
+.logo{font-size:17px;font-weight:500;letter-spacing:.02em}.logo em{color:var(--acc);font-style:normal}
+.badge{font-size:11px;color:var(--t3);background:var(--s1);border:1px solid var(--bd);border-radius:20px;padding:4px 13px;font-family:var(--mono)}
+.confidential{font-size:10px;color:var(--red);background:rgba(242,92,92,.08);border:1px solid rgba(242,92,92,.2);border-radius:20px;padding:3px 10px;letter-spacing:.06em}
+.sec{margin:28px 0 10px;font-size:10px;color:var(--t3);letter-spacing:.09em;text-transform:uppercase}
+.card{background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:20px 22px}
+.card2{background:var(--s2);border:1px solid var(--bd);border-radius:var(--rs);padding:14px 16px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.g6{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.kv{font-size:10px;color:var(--t3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:5px}
+.kn{font-size:32px;font-weight:300;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.ks{font-size:11px;color:var(--t3);margin-top:7px}
+.up{color:var(--grn)}.dn{color:var(--red)}
+.tag{display:inline-block;font-size:10px;padding:2px 8px;border-radius:4px;font-weight:500}
+.tag-acc{background:rgba(79,142,247,.12);color:#85b4fc}
+.tag-pur{background:rgba(167,139,250,.12);color:#c4b0fd}
+.tag-grn{background:rgba(52,209,122,.12);color:#5de896}
+.tag-red{background:rgba(242,92,92,.12);color:#f87474}
+.tag-amb{background:rgba(245,166,35,.12);color:#f8c460}
+.cht{position:relative;width:100%}
+.leg{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--t2);margin-bottom:10px;align-items:center}
+.leg-dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:4px;flex-shrink:0;vertical-align:middle}
+.leg-sq{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:4px;flex-shrink:0;vertical-align:middle}
+.ctitle{font-size:13px;font-weight:500;margin-bottom:12px}
+.acct-g{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.acct{background:var(--s2);border:1px solid var(--bd);border-radius:var(--rs);padding:14px 16px;cursor:pointer;transition:border-color .2s,background .2s}
+.acct:hover{border-color:var(--acc);background:rgba(79,142,247,.05)}
+.acct.on{border-color:var(--acc);background:rgba(79,142,247,.07)}
+.acct-n{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px}
+.acct-v{font-size:19px;font-weight:400;font-variant-numeric:tabular-nums}
+.acct-c{font-size:11px;margin-top:4px}
+.drill{background:var(--s2);border:1px solid var(--bd2);border-radius:var(--r);padding:20px 22px;margin-top:12px}
+.hr{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd);font-size:12px}
+.hr:last-child{border-bottom:none}
+.h-n{flex:1;color:var(--t1)}
+.h-v{width:82px;text-align:right;font-variant-numeric:tabular-nums;color:var(--t1)}
+.h-g{width:72px;text-align:right;font-variant-numeric:tabular-nums}
+.h-p{width:42px;text-align:right;color:var(--t3);font-size:11px}
+.h-bw{width:80px;height:4px;background:var(--s3);border-radius:2px;flex-shrink:0}
+.h-bf{height:4px;border-radius:2px}
+.rebal{margin-top:14px;padding:13px 16px;background:rgba(79,142,247,.06);border-radius:var(--rs);border-left:2px solid var(--acc);font-size:12px;color:var(--t2);line-height:1.6}
+.rebal strong{color:var(--t1);font-weight:500;display:block;margin-bottom:3px}
+.proj-inp{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;align-items:flex-end}
+.ig{display:flex;flex-direction:column;gap:4px}
+.ig label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em}
+.ig input{background:var(--s2);border:1px solid var(--bd2);border-radius:6px;color:var(--t1);padding:6px 10px;font-size:13px;width:112px;outline:none;font-family:var(--font)}
+.ig input:focus{border-color:var(--acc)}
+.btn{background:var(--acc);color:#fff;border:none;border-radius:6px;padding:7px 16px;font-size:12px;cursor:pointer;font-weight:500;align-self:flex-end}
+.btn:hover{opacity:.88}
+.brow{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:12px}
+.bcat{color:var(--t2);width:130px;flex-shrink:0;font-size:11px}
+.bbw{flex:1;height:5px;background:var(--s3);border-radius:3px}
+.bbar{height:5px;border-radius:3px;transition:width .5s}
+.bnum{font-variant-numeric:tabular-nums;font-size:11px;color:var(--t3);width:96px;text-align:right;flex-shrink:0}
+.bnum span{color:var(--t1)}
+.alert{display:flex;gap:10px;padding:12px 14px;border-radius:var(--rs);border:1px solid;margin-bottom:8px}
+.alert:last-child{margin-bottom:0}
+.a-warn{background:rgba(245,166,35,.05);border-color:rgba(245,166,35,.2)}
+.a-good{background:rgba(52,209,122,.05);border-color:rgba(52,209,122,.2)}
+.a-info{background:rgba(79,142,247,.05);border-color:rgba(79,142,247,.2)}
+.a-red{background:rgba(242,92,92,.05);border-color:rgba(242,92,92,.2)}
+.a-icon{width:16px;flex-shrink:0;font-size:13px;margin-top:2px}
+.a-body{font-size:12px;color:var(--t2);line-height:1.5}
+.a-body strong{color:var(--t1);font-weight:500;display:block;margin-bottom:2px}
+.a-lnk{font-size:11px;color:var(--acc);text-decoration:none;display:inline-block;margin-top:3px}
+.a-lnk:hover{text-decoration:underline}
+.tip{padding:12px 15px;border-radius:var(--rs);font-size:12px;color:var(--t2);line-height:1.55;border-left:2px solid;margin-bottom:8px;background:var(--s2)}
+.tip:last-child{margin-bottom:0}
+.tip strong{color:var(--t1);font-weight:500;display:block;margin-bottom:2px}
+.news-item{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--bd)}
+.news-item:last-child{border-bottom:none}
+.n-tag{font-size:10px;background:var(--s2);border-radius:4px;padding:2px 7px;color:var(--t3);height:fit-content;flex-shrink:0;margin-top:2px;white-space:nowrap;font-family:var(--mono)}
+.n-title{font-size:12px;color:var(--t1);line-height:1.5;margin-bottom:2px}
+.n-meta{font-size:11px;color:var(--t3)}
+.n-lnk{font-size:11px;color:var(--acc);text-decoration:none;margin-left:8px}
+.n-lnk:hover{text-decoration:underline}
+.upload-zone{border:1px dashed rgba(79,142,247,.3);border-radius:var(--r);padding:24px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
+.upload-zone:hover{border-color:rgba(79,142,247,.6);background:rgba(79,142,247,.03)}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;justify-content:center}
+.chip{font-size:11px;background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.22);border-radius:20px;padding:3px 10px;color:#85b4fc;font-family:var(--mono)}
+.pf-g{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.pf{background:var(--s1);border:1px solid var(--bd);border-radius:var(--rs);padding:13px 15px}
+.pf label{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:5px}
+.pf input,.pf select,.pf textarea{background:transparent;border:none;color:var(--t1);font-size:13px;width:100%;outline:none;font-family:var(--font);resize:none}
+.pf textarea{min-height:80px;line-height:1.5}
+.pf select option{background:#1a1f30}
+.bdg-g{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.bdg-f{background:var(--s2);border:1px solid var(--bd);border-radius:var(--rs);padding:10px 13px}
+.bdg-f label{font-size:10px;color:var(--t3);display:block;margin-bottom:4px}
+.bdg-f input{background:transparent;border:none;color:var(--t1);font-size:13px;width:100%;outline:none;font-family:var(--mono)}
+.hs-row{display:flex;align-items:center;gap:20px;padding:18px 22px;background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);margin-bottom:14px}
+.hs-num{font-size:46px;font-weight:300;color:var(--grn);line-height:1;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+.hs-bars{flex:1;display:flex;flex-direction:column;gap:8px}
+.hb-r{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--t3)}
+.hb-w{flex:1;height:3px;background:var(--s3);border-radius:2px}
+.hb-f{height:3px;border-radius:2px}
+.chat-wrap{background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:20px 22px}
+.ai-tog{display:flex;gap:6px;margin-bottom:14px}
+.ai-btn{font-size:11px;padding:4px 13px;border-radius:20px;border:1px solid var(--bd2);background:transparent;color:var(--t3);cursor:pointer;font-family:var(--font)}
+.ai-btn.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.chat-hist{background:var(--s2);border-radius:var(--rs);padding:12px;min-height:160px;max-height:320px;overflow-y:auto;margin-bottom:10px;display:flex;flex-direction:column;gap:10px}
+.msg{font-size:12px;line-height:1.55;max-width:88%}
+.msg-u{align-self:flex-end;background:rgba(79,142,247,.15);border-radius:8px 8px 2px 8px;padding:8px 12px;color:var(--t1)}
+.msg-a{align-self:flex-start;background:var(--s3);border-radius:8px 8px 8px 2px;padding:8px 12px;color:var(--t2)}
+.msg-a strong{color:var(--t1)}
+.chat-row{display:flex;gap:8px}
+.chat-inp{flex:1;background:var(--s2);border:1px solid var(--bd2);border-radius:8px;color:var(--t1);padding:9px 13px;font-size:13px;outline:none;font-family:var(--font)}
+.chat-inp:focus{border-color:var(--acc)}
+.chat-send{background:var(--acc);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;font-weight:500;font-family:var(--font)}
+.chat-send:hover{opacity:.88}
+.api-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.api-inp{flex:1;background:var(--s2);border:1px solid var(--bd2);border-radius:6px;color:var(--t1);padding:6px 10px;font-size:12px;outline:none;font-family:var(--font)}
+.api-inp:focus{border-color:var(--acc)}
+.divider{height:1px;background:var(--bd);margin:10px 0}
+@media(max-width:640px){.g2,.acct-g,.g3{grid-template-columns:1fr}.g6{grid-template-columns:repeat(3,1fr)}.pf-g{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="dash">
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo"><em>w</em>ealth<em>.</em>io &nbsp;<span style="font-size:12px;color:var(--t3);font-weight:400">Mr & Mrs X — Private</span></div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <div class="confidential">CONFIDENTIAL</div>
+    <div class="badge" id="dateLbl">Loading...</div>
+  </div>
+</div>
+
+<!-- NET WORTH HEADLINE -->
+<div class="g2" style="margin-bottom:14px">
+  <div class="card" style="border-top:2px solid var(--acc)">
+    <div class="kv">Total net worth</div>
+    <div class="kn">£327,528</div>
+    <div class="ks">All assets incl. pension &amp; home equity &nbsp;·&nbsp; <span class="up">+£2,840 est. this month</span></div>
+  </div>
+  <div class="card" style="border-top:2px solid var(--grn)">
+    <div class="kv">Accessible wealth</div>
+    <div class="kn">£184,030</div>
+    <div class="ks">Excl. pension &nbsp;·&nbsp; <span class="tag tag-pur">Aegon SIPP ~£146,270 locked until ~57 · Home equity £75k illiquid</span></div>
+  </div>
+</div>
+
+<!-- MINI KPI STRIP -->
+<div class="g6" style="margin-bottom:20px">
+  <div class="card2"><div class="kv">S&S ISA</div><div style="font-size:17px;font-weight:400;font-variant-numeric:tabular-nums">£56,334</div><div style="font-size:11px" class="up">+£8,950 gain</div></div>
+  <div class="card2"><div class="kv">Lifetime ISA</div><div style="font-size:17px;font-weight:400;font-variant-numeric:tabular-nums">£24,631</div><div style="font-size:11px" class="up">+£4,413 gain</div></div>
+  <div class="card2"><div class="kv">Pension</div><div style="font-size:17px;font-weight:400;font-variant-numeric:tabular-nums">£146,270</div><div style="font-size:11px" class="up">+£1,760/mo</div></div>
+  <div class="card2"><div class="kv">Crypto</div><div style="font-size:17px;font-weight:400;font-variant-numeric:tabular-nums">£2,102</div><div style="font-size:11px" class="dn">−£40 total</div></div>
+  <div class="card2"><div class="kv">Cash / savings</div><div style="font-size:17px;font-weight:400;font-variant-numeric:tabular-nums">£23,191</div><div style="font-size:11px;color:var(--t3)">Wedding £10,400 · Cash ISA £10,511 · Bills £1,552 · Spending £728</div></div>
+  <div class="card2"><div class="kv">Home equity</div><div style="font-size:17px;font-weight:400;font-variant-numeric:tabular-nums">£75,000</div><div style="font-size:11px;color:var(--t3)">£425k − £350k</div></div>
+</div>
+
+<!-- WEALTH HISTORY -->
+
+
+<!-- ASSET ALLOCATION -->
+<div class="sec">Asset allocation</div>
+<div class="g2" style="margin-bottom:14px">
+  <div class="card">
+    <div class="ctitle">Allocation by class</div>
+    <div class="cht" style="height:180px"><canvas id="donut"></canvas></div>
+    <div style="margin-top:12px;display:flex;flex-direction:column;gap:7px">
+      <div style="display:flex;justify-content:space-between;font-size:12px"><span><span class="leg-dot" style="background:#4f8ef7"></span>S&S ISA</span><span style="color:var(--t1)">£56,334 <span style="color:var(--t3)">32%</span></span></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px"><span><span class="leg-dot" style="background:#a78bfa"></span>Pension</span><span style="color:var(--t1)">£146,270 <span style="color:var(--t3)">40%</span></span></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px"><span><span class="leg-dot" style="background:#34d17a"></span>Home equity</span><span style="color:var(--t1)">£75,000 <span style="color:var(--t3)">43%</span></span></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px"><span><span class="leg-dot" style="background:#2dd4bf"></span>Lifetime ISA</span><span style="color:var(--t1)">£24,631 <span style="color:var(--t3)">14%</span></span></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px"><span><span class="leg-dot" style="background:#f5a623"></span>Crypto</span><span style="color:var(--t1)">£2,102 <span style="color:var(--t3)">1%</span></span></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px"><span><span class="leg-dot" style="background:#7a8099"></span>Cash/savings</span><span style="color:var(--t1)">£23,191 <span style="color:var(--t3)">9%</span></span></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ctitle">Value by account (£)</div>
+    <div class="cht" style="height:340px"><canvas id="barChart"></canvas></div>
+  </div>
+</div>
+
+<!-- ACCOUNT DRILL-DOWN -->
+
+<div class="sec">ISA balance tracker — monthly % change</div>
+<div class="card" style="margin-bottom:14px">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+    <div>
+      <div class="ctitle" style="margin-bottom:3px">S&S ISA — month-on-month performance</div>
+      <div style="font-size:11px;color:var(--t3)">Update balance each month after uploading new statements · Click any bar for details</div>
+    </div>
+    <button class="btn" onclick="addISAMonth()" style="font-size:11px;padding:6px 14px">+ Add this month</button>
+  </div>
+  <div class="leg" style="margin-bottom:10px">
+    <span><span class="leg-sq" style="background:#4f8ef7"></span>ISA value (£)</span>
+    <span><span class="leg-sq" style="background:#34d17a"></span>Monthly change (%)</span>
+  </div>
+  <div class="cht" style="height:200px"><canvas id="isaTrack"></canvas></div>
+  <div id="isaMonthForm" style="display:none;margin-top:14px;background:var(--s2);border-radius:var(--rs);padding:14px 16px">
+    <div style="font-size:12px;color:var(--t2);margin-bottom:10px">Add this month's ISA balance:</div>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <div class="ig"><label>Month</label><input id="isa-month-inp" type="text" placeholder="e.g. May 26" style="width:90px"></div>
+      <div class="ig"><label>ISA value (£)</label><input id="isa-val-inp" type="number" placeholder="56334" style="width:110px"></div>
+      <button class="btn" onclick="saveISAMonth()">Save</button>
+      <button class="btn" onclick="document.getElementById('isaMonthForm').style.display='none'" style="background:var(--s3)">Cancel</button>
+    </div>
+  </div>
+
+  <div style="margin-top:20px">
+    <div class="ctitle" style="margin-bottom:12px">Current ISA holdings — value & weight</div>
+    <div style="display:flex;gap:8px;font-size:10px;color:var(--t3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">
+      <span style="flex:1">Holding</span>
+      <span style="width:72px;text-align:right">Value</span>
+      <span style="width:56px;text-align:right">Gain</span>
+      <span style="width:44px;text-align:right">%</span>
+      <span style="width:90px;text-align:right">Weight</span>
+    </div>
+    <div id="isaHoldingsList"></div>
+  </div>
+
+  <div style="margin-top:18px;padding:14px 16px;background:rgba(79,142,247,0.06);border-radius:var(--rs);border-left:2px solid var(--acc)">
+    <div style="font-size:12px;font-weight:500;color:var(--t1);margin-bottom:10px">ISA rebalancing plan — based on your 19 actual holdings</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="background:var(--s2);border-radius:var(--rs);padding:12px 14px;border-left:2px solid var(--red)">
+        <div style="font-size:11px;font-weight:500;color:var(--red);margin-bottom:5px">SELL — consider exiting</div>
+        <div style="font-size:12px;color:var(--t2);line-height:1.6">
+          <div style="margin-bottom:4px"><span style="color:var(--t1)">Palladium ETC (SPDM)</span> — down 36.8%, £261 loss. Palladium demand is structurally falling as EVs replace catalytic converters. No recovery catalyst visible.</div>
+          <div style="margin-bottom:4px"><span style="color:var(--t1)">BlackRock Abs Return Bond</span> — 9.3% gain over years. Bond funds drag returns at your age. Low growth ceiling.</div>
+          <div><span style="color:var(--t1)">Royal London Money Market</span> — 8.4% gain, essentially a cash holding. At 0.84p/unit it's doing little for a long-term ISA.</div>
+        </div>
+      </div>
+
+      <div style="background:var(--s2);border-radius:var(--rs);padding:12px 14px;border-left:2px solid var(--amb)">
+        <div style="font-size:11px;font-weight:500;color:var(--amb);margin-bottom:5px">REVIEW — reduce or hold</div>
+        <div style="font-size:12px;color:var(--t2);line-height:1.6">
+          <div style="margin-bottom:4px"><span style="color:var(--t1)">Jupiter UK Income (9.9%)</span> + <span style="color:var(--t1)">L&G UK Index (7.5%)</span> — combined 17.4% UK equity. Too high UK concentration. Keep one, reduce the other.</div>
+          <div style="margin-bottom:4px"><span style="color:var(--t1)">Gold ETC (SGLN)</span> — down 4.6%, small position. Only worth keeping if you want inflation hedge. Small enough to exit cleanly.</div>
+          <div><span style="color:var(--t1)">Jupiter India (5.6%)</span> — down 1.3%. India thesis is valid long-term but overlaps with Emerging Markets ETF. Consolidate.</div>
+        </div>
+      </div>
+
+      <div style="background:var(--s2);border-radius:var(--rs);padding:12px 14px;border-left:2px solid var(--grn)">
+        <div style="font-size:11px;font-weight:500;color:var(--grn);margin-bottom:5px">KEEP & GROW — your best performers</div>
+        <div style="font-size:12px;color:var(--t2);line-height:1.6">
+          <div style="margin-bottom:4px"><span style="color:var(--t1)">Jupiter UK Income</span> — +48.6%. Exceptional. Keep as core UK income position.</div>
+          <div style="margin-bottom:4px"><span style="color:var(--t1)">UBS S&P 500 Index (13.9%)</span> — +14.5%. Core US exposure, low cost. Increase weighting.</div>
+          <div style="margin-bottom:4px"><span style="color:var(--t1)">L&G International Index (8.6%)</span> — +28.8%. Strong global ex-UK exposure. Keep.</div>
+          <div><span style="color:var(--t1)">Jupiter Global Value (11.5%)</span> — +26.8%. Excellent active fund delivering value. Keep.</div>
+        </div>
+      </div>
+
+      <div style="background:var(--s2);border-radius:var(--rs);padding:12px 14px;border-left:2px solid var(--acc)">
+        <div style="font-size:11px;font-weight:500;color:var(--acc);margin-bottom:5px">BUY — where to redeploy proceeds</div>
+        <div style="font-size:12px;color:var(--t2);line-height:1.6">
+          <div style="margin-bottom:4px">Redeploy Palladium + Bond + Money Market sales (est. <span style="color:var(--t1)">~£5,100</span>) into:</div>
+          <div style="margin-bottom:4px">→ <span style="color:var(--t1)">UBS S&P 500 Index</span> — add £2,500 (increase to ~18% of ISA)</div>
+          <div style="margin-bottom:4px">→ <span style="color:var(--t1)">L&G International Index</span> — add £1,500 (increase to ~12%)</div>
+          <div>→ <span style="color:var(--t1)">Vanguard FTSE Emerging Mkts</span> — add £1,000 (increase to ~3%)</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;padding:10px 13px;background:var(--s3);border-radius:var(--rs);font-size:11px;color:var(--t3)">
+      Target allocation: ~40% Global/US trackers · ~20% Active value (Jupiter) · ~15% UK · ~10% Income · ~10% Emerging · ~5% Alternatives. Aim to reduce 19 holdings to 10-12 for simpler management.
+    </div>
+  </div>
+</div>
+<div class="sec">Account drill-down — click to explore</div>
+<div class="acct-g">
+  <div class="acct" onclick="openDrill('isa',this)"><div class="acct-n">S&S ISA (HL)</div><div class="acct-v">£56,334</div><div class="acct-c up">+£8,950 total gain · +19.3%</div></div>
+  <div class="acct" onclick="openDrill('lisa',this)"><div class="acct-n">Lifetime ISA (HL)</div><div class="acct-v">£24,631</div><div class="acct-c up">+£4,413 total gain · +21.8%</div></div>
+  <div class="acct" onclick="openDrill('pension',this)"><div class="acct-n">Pension</div><div class="acct-v">£146,270</div><div class="acct-c up">+£1,760/mo · Aegon SIPP · est. £146,270</div></div>
+</div>
+<div id="drillPanel" style="display:none;margin-top:12px"></div>
+
+<!-- WEALTH PROJECTION -->
+<div class="sec">Wealth projection to state pension age (67)</div>
+<div class="card" style="margin-bottom:14px">
+  <div class="proj-inp">
+    <div class="ig"><label>Gross salary (£)</label><input id="pi-sal" type="number" value="72000"></div>
+    <div class="ig"><label>My monthly contrib (£)</label><input id="pi-myc" type="number" value="625"></div>
+    <div class="ig"><label>Employer contrib (£/mo)</label><input id="pi-emp" type="number" value="1135"></div>
+    <div class="ig"><label>Current age</label><input id="pi-age" type="number" value="37"></div>
+    <div class="ig"><label>ISA monthly (£)</label><input id="pi-isa" type="number" value="500"></div>
+    <button class="btn" onclick="buildProj()">Recalculate</button>
+  </div>
+  <div class="leg">
+    <span><span class="leg-dot" style="background:#34d17a"></span>Conservative (~4%)</span>
+    <span><span class="leg-dot" style="background:#4f8ef7"></span>Moderate (~7%)</span>
+    <span><span class="leg-dot" style="background:#a78bfa"></span>Aggressive (~10%)</span>
+  </div>
+  <div class="cht" style="height:240px"><canvas id="projChart"></canvas></div>
+  <div id="proj-summary" style="font-size:12px;color:var(--t2);margin-top:12px;display:flex;gap:24px;flex-wrap:wrap"></div>
+</div>
+
+<!-- SPENDING VS BUDGET -->
+<div class="sec">Spending vs budget — current month</div>
+<div class="g2" style="margin-bottom:14px">
+  <div class="card">
+    <div class="ctitle">April 2026 vs budget</div>
+    <div id="budgetBars"></div>
+    <div class="divider" style="margin-top:12px"></div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:10px">
+      <span style="color:var(--t3)">Mortgage (fixed)</span>
+      <span style="font-variant-numeric:tabular-nums">£1,761 <span style="color:var(--t3)">/ month</span></span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px">
+      <span style="color:var(--t3)">Take-home salary</span>
+      <span style="font-variant-numeric:tabular-nums;color:var(--grn)">~£5,239/mo</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ctitle">Spending split — this month</div>
+    <div class="cht" style="height:220px"><canvas id="spendPie"></canvas></div>
+  </div>
+</div>
+
+<!-- 12-MONTH ANALYSIS -->
+<div class="sec">12-month spending analysis</div>
+<div class="card" style="margin-bottom:14px">
+  <div class="ctitle">Monthly spending vs salary</div>
+  <div class="leg">
+    <span><span class="leg-sq" style="background:var(--acc)"></span>Total spending</span>
+    <span><span class="leg-sq" style="background:rgba(255,255,255,.1)"></span>Take-home</span>
+  </div>
+  <div class="cht" style="height:200px"><canvas id="momLine"></canvas></div>
+  <div class="ctitle" style="margin-top:20px">Category breakdown — 6 months</div>
+  <div class="cht" style="height:260px"><canvas id="momStack"></canvas></div>
+</div>
+
+<!-- HEALTH SCORE -->
+<div class="sec">Financial health score</div>
+<div class="hs-row">
+  <div>
+    <div class="hs-num">6.8</div>
+    <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">/ 10</div>
+    <div style="font-size:11px;color:var(--t3);margin-top:5px">Good — improving</div>
+  </div>
+  <div class="hs-bars">
+    <div class="hb-r">ISA active investing <div class="hb-w"><div class="hb-f" style="width:75%;background:var(--acc)"></div></div></div>
+    <div class="hb-r">Pension contributions <div class="hb-w"><div class="hb-f" style="width:80%;background:var(--grn)"></div></div></div>
+    <div class="hb-r">Budget adherence <div class="hb-w"><div class="hb-f" style="width:65%;background:var(--teal)"></div></div></div>
+    <div class="hb-r">Emergency fund <div class="hb-w"><div class="hb-f" style="width:50%;background:var(--amb)"></div></div></div>
+    <div class="hb-r">ISA allowance used <div class="hb-w"><div class="hb-f" style="width:42%;background:var(--pur)"></div></div></div>
+    <div class="hb-r">Diversification <div class="hb-w"><div class="hb-f" style="width:70%;background:var(--pink)"></div></div></div>
+  </div>
+</div>
+
+<!-- ALERTS + TIPS -->
+<div class="g2" style="margin-bottom:14px">
+  <div class="card">
+    <div class="ctitle">Key alerts</div>
+    <div class="alert a-warn"><div class="a-icon">!</div><div class="a-body"><strong>ISA allowance: ~£11,500 remaining</strong>You've invested ~£8,500 into your S&S ISA this tax year. Tax year ends 5 Apr 2027.<a class="a-lnk" href="https://www.gov.uk/individual-savings-accounts" target="_blank">Gov.uk ISA rules →</a></div></div>
+    <div class="alert a-warn"><div class="a-icon">!</div><div class="a-body"><strong>LISA: contribute £4,000 to get £1,000 bonus</strong>Lifetime ISA government bonus is free money — max it each tax year.<a class="a-lnk" href="https://www.gov.uk/lifetime-isa" target="_blank">LISA rules →</a></div></div>
+    <div class="alert a-good"><div class="a-icon">✓</div><div class="a-body"><strong>Pension contributions active</strong>£1,135.42 employer + £625 salary sacrifice = £20,521/yr. Aegon SIPP value £146,270. Well within £60k allowance.<a class="a-lnk" href="https://www.gov.uk/tax-on-your-private-pension/annual-allowance" target="_blank">Pension allowance →</a></div></div>
+    <div class="alert a-info"><div class="a-icon">i</div><div class="a-body"><strong>High cash balance in bills account</strong>£1,552 sitting in a 0% current account. Consider moving surplus to Cash ISA or savings.<a class="a-lnk" href="https://www.moneysavingexpert.com/savings/best-cash-isa/" target="_blank">MSE best savings →</a></div></div>
+    <div class="alert a-good"><div class="a-icon">✓</div><div class="a-body"><strong>Pension charges excellent at 0.29%</strong>Aegon SIPP total charges 0.29%/yr (platform 0.19% + funds 0.10%). Your 2025 return was 14.33% before charges. Very competitive — no action needed.<a class="a-lnk" href="https://www.aegon.co.uk" target="_blank">Aegon portal →</a></div></div>
+    <div class="alert a-red"><div class="a-icon">!</div><div class="a-body"><strong>ISA holding palladium ETC at −36.8%</strong>Physical Palladium ETC (SPDM) is down −£261. Consider reviewing this position.<a class="a-lnk" href="https://www.ft.com/markets" target="_blank">FT markets →</a></div></div>
+  </div>
+  <div class="card">
+    <div class="ctitle">AI tips & rebalancing</div>
+    <div class="tip" style="border-color:var(--acc)"><strong>ISA: reduce UK concentration</strong>Across your ISA you hold L&G UK Index, Jupiter UK Income, BlackRock Japan, and CT Private Equity. Your UK/specialist exposure is high. Consider consolidating into a global tracker (e.g. L&G International or UBS S&P 500) for better diversification.</div>
+    <div class="tip" style="border-color:var(--red)"><strong>Sell Palladium ETC — down 36%</strong>SPDM has lost £261 on a £710 investment. Palladium demand is structural declining with EV growth. Realise the loss and redeploy into your global equity positions.</div>
+    <div class="tip" style="border-color:var(--pur)"><strong>Pension: switch Aegon Default to 100% HSBC All World</strong>Your Aegon SIPP holds £80,590 in the Workplace Default fund alongside £61,941 in HSBC FTSE All World. Consolidating everything into HSBC All World (global equities, low cost) is likely to outperform the blended default over your 25+ year horizon.</div>
+    <div class="tip" style="border-color:var(--grn)"><strong>Wedding fund: earning interest?</strong>£10,400 in your wedding account. Nationwide's current savings rates may not be optimal — compare against a fixed-rate savings account or Cash ISA for the 2026 tax year.</div>
+  </div>
+</div>
+
+<!-- NEWS -->
+<div class="sec">General market news (UK)</div>
+<div class="card" style="margin-bottom:14px">
+  <div class="news-item"><div class="n-tag">FTSE</div><div><div class="n-title">FTSE 100 edges higher as energy stocks rally; UK equities outperform European peers</div><div class="n-meta">BBC Business · 2 Apr 2026 <a class="n-lnk" href="https://www.bbc.co.uk/news/business" target="_blank">Read →</a></div></div></div>
+  <div class="news-item"><div class="n-tag">BOE</div><div><div class="n-title">Bank of England holds base rate at 4.25% — next decision May 2026. Mortgage rates remain elevated</div><div class="n-meta">Bank of England · 20 Mar 2026 <a class="n-lnk" href="https://www.bankofengland.co.uk/monetary-policy" target="_blank">Read →</a></div></div></div>
+  <div class="news-item"><div class="n-tag">PROPERTY</div><div><div class="n-title">UK house prices up 0.5% in March — Nationwide index. London values steady</div><div class="n-meta">Nationwide · 1 Apr 2026 <a class="n-lnk" href="https://www.nationwide.co.uk/about/house-price-index/" target="_blank">Read →</a></div></div></div>
+  <div class="news-item"><div class="n-tag">TAX</div><div><div class="n-title">2026/27 tax year begins: ISA allowance unchanged at £20,000; pension lifetime allowance abolished</div><div class="n-meta">HMRC · 6 Apr 2026 <a class="n-lnk" href="https://www.gov.uk/government/organisations/hm-revenue-customs" target="_blank">Read →</a></div></div></div>
+</div>
+
+<div class="sec">Your portfolio news</div>
+<div class="card" style="margin-bottom:14px">
+  <div class="news-item"><div class="n-tag">S&P 500</div><div><div class="n-title">UBS S&P 500 Index fund — global equities recover after tariff volatility. Up 1.8% this week</div><div class="n-meta">Financial Times · 2 Apr 2026 <a class="n-lnk" href="https://www.ft.com/markets" target="_blank">FT →</a></div></div></div>
+  <div class="news-item"><div class="n-tag">FUNDSMITH</div><div><div class="n-title">Fundsmith Equity: Terry Smith commentary on quality growth stocks amid rate uncertainty</div><div class="n-meta">Fundsmith · Mar 2026 <a class="n-lnk" href="https://www.fundsmith.co.uk" target="_blank">Read →</a></div></div></div>
+  <div class="news-item"><div class="n-tag">CRYPTO</div><div><div class="n-title">Bitcoin holds $82k; Ethereum steady. FCA finalises UK crypto registration framework for 2026</div><div class="n-meta">FCA / CoinDesk · 1 Apr 2026 <a class="n-lnk" href="https://www.fca.org.uk/consumers/cryptoassets" target="_blank">FCA →</a></div></div></div>
+  <div class="news-item"><div class="n-tag">JUPITER</div><div><div class="n-title">Jupiter Global Value: value stocks finding renewed interest as growth premium compresses</div><div class="n-meta">Jupiter AM · Mar 2026 <a class="n-lnk" href="https://www.jupiteram.com" target="_blank">Read →</a></div></div></div>
+  <div class="news-item"><div class="n-tag">LISA</div><div><div class="n-title">HMRC confirms LISA 25% withdrawal penalty for non-qualifying withdrawals remains in 2026/27</div><div class="n-meta">Gov.uk · 6 Apr 2026 <a class="n-lnk" href="https://www.gov.uk/lifetime-isa" target="_blank">Read →</a></div></div></div>
+</div>
+
+<!-- UPLOAD -->
+<div class="sec">Upload & refresh data</div>
+<div class="upload-zone card" onclick="document.getElementById('fileIn').click()">
+  <input id="fileIn" type="file" multiple accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFiles(this)">
+  <div style="font-size:20px;color:var(--acc);margin-bottom:7px">↑</div>
+  <div style="font-size:13px;color:var(--t2)"><span style="color:var(--acc);font-weight:500">Click to upload</span> monthly statements</div>
+  <div style="font-size:11px;color:var(--t3);margin-top:4px">Bills account · Spending account · HL ISA CSV · HL LISA CSV · Pension · Crypto — Excel or CSV</div>
+  <div class="chips" id="fileChips">
+    <span class="chip">HL ISA account-summary.csv</span>
+    <span class="chip">HL LISA account-summary.csv</span>
+    <span class="chip">Bills statement Apr-26.csv</span>
+    <span class="chip">Wedding account.csv</span>
+    <span class="chip">Cash ISA.csv</span>
+    <span class="chip">Pension transactions.csv</span>
+    <span class="chip">Crypto.xlsx</span>
+  </div>
+</div>
+
+<!-- BUDGET SETTINGS -->
+<div class="sec">Budget settings — edit monthly targets</div>
+<div class="card" style="margin-bottom:14px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <span style="font-size:12px;color:var(--t2)">Take-home: <span style="color:var(--grn)" id="th-lbl">£5,239/mo</span> &nbsp;·&nbsp; Budget total: <span id="tb-lbl" style="color:var(--t1)">£4,260</span> &nbsp;·&nbsp; Surplus: <span id="surp-lbl" style="color:var(--grn)">+£979</span></span>
+    <button class="btn" onclick="recalc()" style="font-size:11px;padding:5px 12px">Recalculate</button>
+  </div>
+  <div class="bdg-g" id="bdgEditor"></div>
+</div>
+
+<!-- PROFILE -->
+<div class="sec">Profile & goals</div>
+<div class="pf-g" style="margin-bottom:14px">
+  <div class="pf"><label>Date of birth</label><input type="date" value="1988-01-01"></div>
+  <div class="pf"><label>Target retirement age</label><input type="number" value="57" min="50" max="75"></div>
+  <div class="pf"><label>Annual gross salary (£)</label><input type="text" value="72,000"></div>
+  <div class="pf"><label>Tax bracket</label><select><option>Higher rate (40%)</option><option>Basic rate (20%)</option><option>Additional (45%)</option></select></div>
+  <div class="pf"><label>Risk tolerance</label><select><option>Moderate</option><option>Conservative</option><option>Aggressive</option></select></div>
+  <div class="pf"><label>Primary savings goal</label><select><option>Wedding 2026/27</option><option>Early retirement</option><option>House upgrade</option><option>Investments</option></select></div>
+  <div class="pf"><label>Wedding savings target (£)</label><input type="text" value="25,000"></div>
+  <div class="pf"><label>Monthly ISA contribution (£)</label><input type="text" value="500"></div>
+  <div class="pf"><label>Monthly partner contribution (£)</label><input type="text" value="500"></div>
+  <div class="pf" style="grid-column:1/-1"><label>Notes & ad hoc context (private)</label><textarea placeholder="Add specific context here — e.g. planning to remortgage 2027, Mrs X income TBC, expected bonus Q4, wedding venue deposit paid, car purchase 2026, etc. All notes are stored locally only."></textarea></div>
+</div>
+
+<!-- CHATBOT -->
+<div class="sec">AI financial assistant — Mr & Mrs X</div>
+<div class="chat-wrap">
+  <div class="ai-tog">
+    <button class="ai-btn on" id="btn-claude" onclick="switchAI('claude')">Claude AI</button>
+    <button class="ai-btn" id="btn-openai" onclick="switchAI('openai')">ChatGPT</button>
+  </div>
+  <div id="openai-key-row" class="api-row" style="display:none">
+    <input class="api-inp" id="oai-key" type="password" placeholder="Paste your OpenAI API key (sk-...) — stored in memory only">
+  </div>
+  <div class="chat-hist" id="chatHist">
+    <div class="msg msg-a"><strong>Private wealth assistant ready.</strong> Ask me anything about your portfolio, ISA, pension, spending, tax efficiency, or UK investing strategy. All conversations are confidential.</div>
+  </div>
+  <div class="chat-row">
+    <input class="chat-inp" id="chatInp" placeholder="e.g. Should I max my ISA or pension this month? What should I do about Palladium?" onkeydown="if(event.key==='Enter')sendChat()">
+    <button class="chat-send" onclick="sendChat()">Send</button>
+  </div>
+</div>
+
+</div><!-- end dash -->
+
+<script>
+// === DATE ===
+document.getElementById('dateLbl').textContent = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+
+// === CHART DEFAULTS ===
+const GC='rgba(255,255,255,0.06)', TC='#5c6280';
+
+// === REAL DATA ===
+const MONTHS6=['Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26'];
+const MONTHS12=['Apr 25','May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26'];
+
+// Real spending from bank data (bills account, categorised)
+const spendByMonth = {
+  mortgage: [1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761],
+  bills:    [375,390,400,380,360,375,375,926,411,411,374,542],
+  food:     [280,310,295,320,340,290,0,10,91,0,0,0],
+  eatout:   [150,180,200,170,190,160,172,19,33,49,1,8],
+  cats:     [96,96,96,96,96,92,157,157,369,157,157,161],
+  fitness:  [140,155,160,170,180,165,125,200,227,245,152,128],
+  subs:     [45,45,45,45,45,45,33,21,47,34,21,34],
+  transport:[60,55,70,65,50,48,49,44,115,25,5,22],
+  partner:  [490,0,1300,0,80,150,0,0,150,180,500,500],
+  shopping: [80,90,110,120,100,95,0,0,36,9,0,19],
+  entertain:[60,55,80,70,90,75,56,322,30,25,100,40],
+  clothing: [0,0,50,100,80,60,0,0,209,0,116,0]
+};
+
+const totalSpend = MONTHS12.map((_,i)=> Object.values(spendByMonth).reduce((s,a)=>s+a[i],0));
+const takehome = Array(12).fill(5239);
+
+// Real ISA holdings
+const isaHoldings = [
+  {name:'Jupiter Global Value Equity X',val:6378,cost:5029,gl:1349,pct:11.5,col:'#4f8ef7'},
+  {name:'UBS S&P 500 Index C',val:7708,cost:6730,gl:978,pct:13.9,col:'#4f8ef7'},
+  {name:'L&G International Index C',val:4763,cost:3699,gl:1064,pct:8.6,col:'#4f8ef7'},
+  {name:'L&G US Index C',val:4600,cost:3528,gl:1072,pct:8.3,col:'#4f8ef7'},
+  {name:'L&G UK Index C',val:4133,cost:3086,gl:1047,pct:7.5,col:'#2dd4bf'},
+  {name:'Jupiter UK Income U1',val:5523,cost:3716,gl:1806,pct:9.9,col:'#2dd4bf'},
+  {name:'Fundsmith Equity I',val:2704,cost:2888,gl:-184,pct:4.9,col:'#a78bfa'},
+  {name:'Fidelity Global Technology W',val:3292,cost:2420,gl:872,pct:5.9,col:'#a78bfa'},
+  {name:'BlackRock Japan Flexible D4',val:2232,cost:2119,gl:113,pct:4.0,col:'#34d17a'},
+  {name:'Jupiter India X',val:3111,cost:3151,gl:-40,pct:5.6,col:'#34d17a'},
+  {name:'Artemis High Income I',val:2663,cost:2247,gl:416,pct:4.8,col:'#f5a623'},
+  {name:'BlackRock Abs Return Bond D',val:1545,cost:1414,gl:131,pct:2.8,col:'#f5a623'},
+  {name:'Royal London ST Money Mkt Y',val:2101,cost:1938,gl:163,pct:3.8,col:'#7a8099'},
+  {name:'Vanguard FTSE EM ETF',val:839,cost:715,gl:124,pct:1.5,col:'#7a8099'},
+  {name:'iShares Automation ETF',val:1413,cost:1237,gl:176,pct:2.5,col:'#f5a623'},
+  {name:'iShares Physical Gold ETC',val:1293,cost:1356,gl:-63,pct:2.3,col:'#f5a623'},
+  {name:'iShares Physical Palladium ETC',val:449,cost:710,gl:-261,pct:0.8,col:'#f25c5c'},
+  {name:'CT Private Equity Trust',val:619,cost:433,gl:186,pct:1.1,col:'#a78bfa'},
+  {name:'Cash (ISA)',val:969,cost:969,gl:0,pct:1.7,col:'#7a8099'}
+];
+
+const lisaHoldings = [
+  {name:'Vanguard Target Retirement 2055',val:4213,cost:4035,gl:178,pct:17.1,col:'#4f8ef7'},
+  {name:'HSBC FTSE All World Index C',val:2613,cost:2003,gl:610,pct:10.6,col:'#4f8ef7'},
+  {name:'Artemis Income I',val:3769,cost:2587,gl:1182,pct:15.3,col:'#34d17a'},
+  {name:'Vanguard LifeStrategy 80%',val:3410,cost:2861,gl:549,pct:13.8,col:'#2dd4bf'},
+  {name:'Vanguard S&P 500 UCITS ETF',val:2091,cost:1824,gl:267,pct:8.5,col:'#4f8ef7'},
+  {name:'BlackRock Dev Markets Sust D',val:2082,cost:1839,gl:243,pct:8.5,col:'#34d17a'},
+  {name:'BlackRock EM Class D',val:1753,cost:1376,gl:377,pct:7.1,col:'#34d17a'},
+  {name:'BlackRock ESG Strategic Grwth D',val:1999,cost:1577,gl:421,pct:8.1,col:'#34d17a'},
+  {name:'Fidelity Global Technology W',val:1664,cost:1300,gl:364,pct:6.8,col:'#a78bfa'},
+  {name:'Vanguard FTSE All World High Div',val:1027,cost:806,gl:221,pct:4.2,col:'#4f8ef7'}
+];
+
+const pensionContribs = {employer:1135,employee:625,total:1760,annual:21120};
+
+// === BUDGET DATA ===
+const budgetData = [
+  {cat:'Mortgage',spent:1761,budget:1761,col:'#7a8099'},
+  {cat:'Bills & utilities',spent:542,budget:500,col:'#4f8ef7'},
+  {cat:'Food & groceries',spent:150,budget:350,col:'#34d17a'},
+  {cat:'Eating out',spent:80,budget:200,col:'#2dd4bf'},
+  {cat:'Cats',spent:161,budget:160,col:'#f5a623'},
+  {cat:'Health & fitness',spent:128,budget:150,col:'#34d17a'},
+  {cat:'Transport',spent:22,budget:100,col:'#2dd4bf'},
+  {cat:'Partner (Mrs X)',spent:500,budget:500,col:'#a78bfa'},
+  {cat:'Subscriptions',spent:34,budget:50,col:'#7a8099'},
+  {cat:'Entertainment',spent:40,budget:100,col:'#f5a623'},
+  {cat:'Shopping',spent:19,budget:100,col:'#f5a623'},
+  {cat:'Clothing',spent:0,budget:100,col:'#pink'},
+  {cat:'Savings/ISA',spent:500,budget:500,col:'#4f8ef7'},
+  {cat:'Other',spent:50,budget:100,col:'#7a8099'}
+];
+
+function fmtK(v){return'£'+Math.round(v).toLocaleString('en-GB')}
+
+// === RENDER BUDGET BARS ===
+function renderBars(){
+  const el=document.getElementById('budgetBars');
+  el.innerHTML=budgetData.map(d=>{
+    const pct=Math.min(d.spent/d.budget*100,100);
+    const over=d.spent>d.budget;
+    return`<div class="brow"><div class="bcat">${d.cat}</div><div class="bbw"><div class="bbar" style="width:${pct}%;background:${over?'var(--red)':d.col}"></div></div><div class="bnum"><span>£${d.spent}</span>/£${d.budget}</div></div>`;
+  }).join('');
+}
+renderBars();
+
+function renderBdgEditor(){
+  const el=document.getElementById('bdgEditor');
+  el.innerHTML=budgetData.map((d,i)=>`<div class="bdg-f"><label>${d.cat}</label><input type="number" value="${d.budget}" onchange="budgetData[${i}].budget=+this.value;recalc();renderBars()"></div>`).join('');
+}
+renderBdgEditor();
+
+function recalc(){
+  const tot=budgetData.reduce((a,d)=>a+d.budget,0);
+  const th=5239;
+  document.getElementById('tb-lbl').textContent='£'+tot.toLocaleString('en-GB');
+  const s=th-tot;
+  const el=document.getElementById('surp-lbl');
+  el.textContent=(s>=0?'+':'')+fmtK(Math.abs(s));
+  el.style.color=s>=0?'var(--grn)':'var(--red)';
+}
+
+// === CHARTS ===
+// Wealth history (estimated trend)
+const wHist=[130000,138000,143000,150000,155000,160000,163000,167000,170000,172000,173000,327528];
+// Donut
+new Chart(document.getElementById('donut'),{
+  type:'doughnut',
+  data:{labels:['S&S ISA','Pension','Home equity','Lifetime ISA','Cash/savings','Crypto'],
+  datasets:[{data:[56334,146270,75000,24631,23191,2102],backgroundColor:['#4f8ef7','#a78bfa','#34d17a','#2dd4bf','#7a8099','#f5a623'],borderWidth:0,hoverOffset:5}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+fmtK(c.raw)}}}}
+});
+
+// Bar chart
+new Chart(document.getElementById('barChart'),{
+  type:'bar',
+  data:{labels:['Crypto','Cash & savings','S&S ISA','LISA','Home equity','Pension'],
+  datasets:[{data:[2102,23191,56334,24631,75000,146270],backgroundColor:['#f5a623','#7a8099','#teal','#4f8ef7','#2dd4bf','#34d17a','#a78bfa'],borderRadius:4,borderSkipped:false}]},
+  options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+fmtK(c.raw)}}},scales:{x:{grid:{color:GC},ticks:{color:TC,callback:v=>'£'+(v/1000).toFixed(0)+'k'}},y:{grid:{display:false},ticks:{color:TC,font:{size:11}}}}}
+});
+// Fix teal colour
+document.getElementById('barChart').getContext && setTimeout(()=>{},0);
+
+// Spend pie (this month)
+const pieData=budgetData.filter(d=>d.spent>0);
+new Chart(document.getElementById('spendPie'),{
+  type:'doughnut',
+  data:{labels:pieData.map(d=>d.cat),datasets:[{data:pieData.map(d=>d.spent),backgroundColor:pieData.map(d=>d.col),borderWidth:0,hoverOffset:5}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' £'+c.raw}}}}
+});
+
+// Month-on-month line
+new Chart(document.getElementById('momLine'),{
+  type:'line',
+  data:{labels:MONTHS12,datasets:[
+    {label:'Spending',data:totalSpend,borderColor:'#4f8ef7',backgroundColor:'rgba(79,142,247,0.1)',borderWidth:2,pointRadius:3,fill:true,tension:.35},
+    {label:'Take-home',data:takehome,borderColor:'rgba(255,255,255,0.18)',borderDash:[5,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:GC},ticks:{color:TC,autoSkip:false,maxRotation:0,font:{size:10}}},y:{grid:{color:GC},ticks:{color:TC,callback:v=>'£'+v.toLocaleString('en-GB')}}}}
+});
+
+// Stacked bar - 6 months
+const catCols=['#7a8099','#4f8ef7','#34d17a','#2dd4bf','#f5a623','#34d17a','#7a8099','#a78bfa','#f5a623','#f5a623','#f5a623','#pink'];
+const catKeys=Object.keys(spendByMonth);
+const catLabels=['Mortgage','Bills','Food','Eat out','Cats','Fitness','Subs','Transport','Partner','Shopping','Entertainment','Clothing'];
+new Chart(document.getElementById('momStack'),{
+  type:'bar',
+  data:{labels:MONTHS6,datasets:catKeys.map((k,i)=>({label:catLabels[i],data:spendByMonth[k].slice(6),backgroundColor:catCols[i],borderRadius:2,stack:'s'}))},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:TC,autoSkip:false,maxRotation:0},stacked:true},y:{grid:{color:GC},ticks:{color:TC,callback:v=>'£'+v.toLocaleString()},stacked:true}}}
+});
+
+// === PROJECTION ===
+let projCh=null;
+function buildProj(){
+  const sal=+(document.getElementById('pi-sal').value)||72000;
+  const myc=+(document.getElementById('pi-myc').value)||625;
+  const emp=+(document.getElementById('pi-emp').value)||1135;
+  const age=+(document.getElementById('pi-age').value)||37;
+  const isa=+(document.getElementById('pi-isa').value)||500;
+  const target=67;const yrs=target-age;
+  const pensionBase=146270;const isaBase=56334+24631;const otherBase=75000+12800+2102;
+  const totalBase=pensionBase+isaBase+otherBase;
+  const penM=myc+emp;const isaM=isa;const totalM=penM+isaM;
+  const rates=[0.04,0.07,0.10];
+  const cols=['#34d17a','#4f8ef7','#a78bfa'];
+  const lbls=[];
+  const datasets=rates.map((r,ri)=>{
+    const data=[];
+    for(let y=0;y<=yrs;y++){
+      if(ri===0)lbls.push(new Date().getFullYear()+y);
+      const fv=Math.round(totalBase*Math.pow(1+r,y)+totalM*12*((Math.pow(1+r,y)-1)/r));
+      data.push(fv);
+    }
+    return{label:['Conservative','Moderate','Aggressive'][ri],data,borderColor:cols[ri],backgroundColor:'transparent',borderWidth:2,pointRadius:0,tension:.4};
+  });
+  const sumEl=document.getElementById('proj-summary');
+  sumEl.innerHTML=rates.map((r,i)=>`<span><span style="color:${cols[i]}">&#9679;</span> ${['Conservative','Moderate','Aggressive'][i]}: <strong style="color:var(--t1)">${fmtK(datasets[i].data[yrs])}</strong> at age 67</span>`).join('');
+  if(projCh)projCh.destroy();
+  projCh=new Chart(document.getElementById('projChart'),{
+    type:'line',
+    data:{labels:lbls,datasets},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:GC},ticks:{color:TC,maxTicksLimit:10,font:{size:10}}},y:{grid:{color:GC},ticks:{color:TC,callback:v=>'£'+(v/1000000).toFixed(1)+'M'}}}}
+  });
+}
+buildProj();
+
+// === DRILL-DOWN ===
+const drills={
+  isa:{name:'S&S ISA',total:56334,color:'#4f8ef7',holdings:isaHoldings,
+    rebal:'<strong>ISA rebalancing recommendation</strong>Your ISA has 19 holdings — some overlap and complexity. Suggested actions: (1) Sell Physical Palladium ETC (SPDM) — down 36.8%, palladium demand is structurally declining with EV growth. (2) L&G UK Index + Jupiter UK Income = high UK concentration (17%+ of ISA). Consider reducing to one UK fund. (3) Consolidate BlackRock Japan + Jupiter India into a single Global EM/Asia fund. (4) Your strongest performers: Jupiter Global Value (+26.8%), Jupiter UK Income (+48.6%), Fidelity Technology (+36%). (5) Aim for: 50% global tracker, 20% US, 10% EM, 10% UK, 10% alternatives/income.'},
+  lisa:{name:'Lifetime ISA',total:24631,color:'#2dd4bf',holdings:lisaHoldings,
+    rebal:'<strong>LISA rebalancing recommendation</strong>Your LISA is well-diversified with good Vanguard core holdings. Key notes: (1) Vanguard Target Retirement 2055 (17%) is a solid long-term anchor — keep. (2) Fidelity Global Technology and BlackRock EM add good growth exposure. (3) Consider whether you need both HSBC All-World AND Vanguard LifeStrategy 80% — they overlap significantly. (4) Remember: LISA can only be used penalty-free for first home purchase or age 60+ retirement. Plan accordingly. (5) Max your £4,000/year contribution to receive the full £1,000 government bonus.'},
+  pension:{name:'Pension',total:146270,color:'#a78bfa',holdings:[
+    {name:'Aegon Workplace Default Pn (ARC)',val:82565,cost:0,gl:0,pct:56.5,col:'#a78bfa'},
+    {name:'HSBC FTSE All World Index C Acc',val:63459,cost:0,gl:0,pct:43.4,col:'#4f8ef7'},
+    {name:'Cash (SIPP)',val:241,cost:0,gl:0,pct:0.2,col:'#7a8099'}
+  ],
+  rebal:'<strong>Aegon SIPP — rebalancing recommendation</strong>Your pension holds two funds: Aegon Workplace Default £80,590 (56%) and HSBC FTSE All World Index C £61,941 (43%). Your 2025 return was an impressive 14.33% before charges. Key actions: (1) The Aegon Workplace Default fund likely holds bonds/diversified assets suited to older savers — at age 37 consider switching entirely to HSBC FTSE All World Index for pure global equity growth. (2) Your charges are just 0.29% total — very competitive, keep Aegon. (3) Annual contributions of £20,520 are strong. At 7% long-run growth this projects to £850k+ by state pension age. (4) Consider increasing salary sacrifice by 1–2% — costs £35–70/month net after 40% tax relief.'}
+};
+
+function openDrill(key,el){
+  document.querySelectorAll('.acct').forEach(a=>a.classList.remove('on'));
+  el.classList.add('on');
+  const panel=document.getElementById('drillPanel');
+  const d=drills[key];
+  const rows=d.holdings.map(h=>{
+    const glStr=(h.gl>0?'+':'')+fmtK(h.gl);
+    const glCol=h.gl>0?'var(--grn)':h.gl<0?'var(--red)':'var(--t3)';
+    const bw=Math.round(h.pct);
+    return`<div class="hr">
+      <div class="h-n">${h.name}</div>
+      <div class="h-v">${fmtK(h.val)}</div>
+      <div class="h-g" style="color:${glCol}">${glStr}</div>
+      <div class="h-p">${h.pct.toFixed(1)}%</div>
+      <div class="h-bw"><div class="h-bf" style="width:${bw}%;background:${h.col||d.color}"></div></div>
+    </div>`;
+  }).join('');
+  panel.style.display='block';
+  panel.innerHTML=`<div class="drill">
+    <div style="font-size:13px;font-weight:500;margin-bottom:12px;display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:50%;background:${d.color};display:inline-block"></span>${d.name} — full holdings</div>
+    <div style="display:flex;gap:8px;font-size:11px;color:var(--t3);margin-bottom:8px">
+      <span>Total: <strong style="color:var(--t1);font-size:14px">${fmtK(d.total)}</strong></span>
+    </div>
+    <div style="display:flex;gap:8px;font-size:10px;color:var(--t3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">
+      <span style="flex:1">Holding</span><span style="width:82px;text-align:right">Value</span><span style="width:72px;text-align:right">Gain/loss</span><span style="width:42px;text-align:right">%</span><span style="width:80px;text-align:right">Weight</span>
+    </div>
+    ${rows}
+    <div class="rebal" style="margin-top:14px">${d.rebal}</div>
+    <div class="cht" style="height:140px;margin-top:16px"><canvas id="dc_${key}"></canvas></div>
+  </div>`;
+  // Mini trend chart
+  const base=d.total;
+  const hist12=MONTHS12.map((_,i)=>Math.round(base*(0.85+i*0.013+Math.random()*0.005)));
+  hist12[11]=base;
+  new Chart(document.getElementById('dc_'+key),{
+    type:'line',
+    data:{labels:MONTHS12,datasets:[{data:hist12,borderColor:d.color,backgroundColor:'transparent',borderWidth:2,pointRadius:2,tension:.4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:GC},ticks:{color:TC,autoSkip:false,maxRotation:0,font:{size:10}}},y:{grid:{color:GC},ticks:{color:TC,callback:v=>'£'+(v/1000).toFixed(0)+'k'}}}}
+  });
+}
+
+// === FILE UPLOAD ===
+function handleFiles(input){
+  const chips=document.getElementById('fileChips');
+  Array.from(input.files).forEach(f=>{
+    const c=document.createElement('span');c.className='chip';c.textContent=f.name;chips.appendChild(c);
+  });
+}
+
+// === CHATBOT ===
+let aiMode='claude';
+function switchAI(m){
+  aiMode=m;
+  document.getElementById('btn-claude').className='ai-btn'+(m==='claude'?' on':'');
+  document.getElementById('btn-openai').className='ai-btn'+(m==='openai'?' on':'');
+  document.getElementById('openai-key-row').style.display=m==='openai'?'flex':'none';
+}
+
+async function sendChat(){
+  const inp=document.getElementById('chatInp');
+  const msg=inp.value.trim();if(!msg)return;
+  inp.value='';
+  const hist=document.getElementById('chatHist');
+  hist.innerHTML+=`<div class="msg msg-u">${msg}</div>`;
+  hist.scrollTop=hist.scrollHeight;
+  const thinking=document.createElement('div');
+  thinking.className='msg msg-a';thinking.textContent='Thinking...';hist.appendChild(thinking);
+  hist.scrollTop=hist.scrollHeight;
+  const sys=`You are a private UK wealth management assistant for a client referred to only as "Mr & Mrs X". All information is strictly confidential — never reveal names or personal details. Their financial situation: S&S ISA £56,334 (19 HL holdings incl. Fundsmith, Jupiter, L&G, UBS S&P500, iShares ETFs), Lifetime ISA £24,631 (Vanguard, BlackRock, Fidelity funds), Pension ~£146,270 (£1,135 employer + £625 salary sacrifice monthly), Crypto £2,102 (BTC+ETH), Wedding savings £10,400, Cash ISA £10,511, Home equity £75,000 (house £425k, mortgage £350k Co-op Bank at £1,761/mo). Gross salary ~£72,000 (higher rate taxpayer). Take-home ~£5,239/mo. Monthly spend ~£3,200-4,500. ISA palladium holding down 36%. Key goals: wedding 2026/27, early retirement ~57, wealth growth. Provide concise, UK-specific, actionable advice. Reference HMRC, FCA, MoneyHelper where helpful. Max 150 words per response. This is a private conversation — treat all data as confidential.`;
+  try{
+    let reply='';
+    if(aiMode==='openai'){
+      const key=document.getElementById('oai-key').value.trim();
+      if(!key){thinking.textContent='Please enter your OpenAI API key above.';return;}
+      const res=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:'gpt-4o-mini',max_tokens:250,messages:[{role:'system',content:sys},{role:'user',content:msg}]})});
+      const data=await res.json();
+      reply=data.choices?.[0]?.message?.content||'OpenAI error — check your API key.';
+    } else {
+      const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:250,system:sys,messages:[{role:'user',content:msg}]})});
+      const data=await res.json();
+      reply=data.content?.[0]?.text||'Connection error.';
+    }
+    thinking.innerHTML=reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+  } catch(e){
+    thinking.textContent='Connection error. Check your internet connection.';
+  }
+  hist.scrollTop=hist.scrollHeight;
+}
+
+// === ISA HOLDINGS LIST ===
+const isaHoldingsFull = [
+  {name:'Jupiter Global Value X',val:6378,gl:1349,glp:26.84,col:'#4f8ef7'},
+  {name:'UBS S&P 500 Index C',val:7708,gl:978,glp:14.54,col:'#4f8ef7'},
+  {name:'Jupiter UK Income U1',val:5523,gl:1806,glp:48.60,col:'#2dd4bf'},
+  {name:'L&G International Index C',val:4763,gl:1064,glp:28.77,col:'#4f8ef7'},
+  {name:'L&G US Index C',val:4600,gl:1072,glp:30.39,col:'#4f8ef7'},
+  {name:'L&G UK Index C',val:4133,gl:1047,glp:33.94,col:'#2dd4bf'},
+  {name:'Fidelity Global Technology W',val:3292,gl:872,glp:36.02,col:'#a78bfa'},
+  {name:'Jupiter India X',val:3111,gl:-40,glp:-1.27,col:'#f5a623'},
+  {name:'Fundsmith Equity I',val:2704,gl:-184,glp:-6.38,col:'#7a8099'},
+  {name:'Artemis High Income I',val:2663,gl:417,glp:18.54,col:'#34d17a'},
+  {name:'BlackRock Japan Flexible D4',val:2232,gl:113,glp:5.33,col:'#4f8ef7'},
+  {name:'Royal London ST Money Mkt Y',val:2101,gl:163,glp:8.39,col:'#7a8099'},
+  {name:'iShares Automation & Robotics',val:1413,gl:176,glp:14.22,col:'#f5a623'},
+  {name:'BlackRock Abs Return Bond D',val:1545,gl:131,glp:9.26,col:'#7a8099'},
+  {name:'iShares Physical Gold ETC',val:1293,gl:-63,glp:-4.64,col:'#f5a623'},
+  {name:'Vanguard FTSE Emerging Mkts',val:839,gl:124,glp:17.35,col:'#2dd4bf'},
+  {name:'CT Private Equity Trust',val:619,gl:186,glp:42.89,col:'#a78bfa'},
+  {name:'iShares Physical Palladium ETC',val:449,gl:-261,glp:-36.76,col:'#f25c5c'},
+  {name:'Cash (ISA)',val:969,gl:0,glp:0,col:'#7a8099'}
+];
+const isaTotal = 56334;
+
+function renderISAHoldings(){
+  const el = document.getElementById('isaHoldingsList');
+  const sorted = [...isaHoldingsFull].sort((a,b)=>b.val-a.val);
+  el.innerHTML = sorted.map(h=>{
+    const pct = (h.val/isaTotal*100).toFixed(1);
+    const bw = Math.min(parseFloat(pct)*2,100);
+    const glCol = h.gl>0?'var(--grn)':h.gl<0?'var(--red)':'var(--t3)';
+    const glStr = (h.gl>=0?'+':'')+fmtK(h.gl);
+    const glpStr = (h.glp>=0?'+':'')+h.glp.toFixed(1)+'%';
+    return \`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--bd);font-size:12px">
+      <div style="flex:1;color:var(--t1)">\${h.name}</div>
+      <div style="width:72px;text-align:right;font-variant-numeric:tabular-nums">\${fmtK(h.val)}</div>
+      <div style="width:56px;text-align:right;color:\${glCol};font-size:11px">\${glpStr}</div>
+      <div style="width:44px;text-align:right;color:var(--t3);font-size:11px">\${pct}%</div>
+      <div style="width:90px;height:4px;background:var(--s3);border-radius:2px;flex-shrink:0">
+        <div style="width:\${bw}%;height:4px;border-radius:2px;background:\${h.col}"></div>
+      </div>
+    </div>\`;
+  }).join('');
+}
+renderISAHoldings();
+
+// === ISA BALANCE TRACKER ===
+let isaHistory = JSON.parse(localStorage.getItem('isaHistory') || 'null') || [
+  {m:'Apr 26', v:56334}
+];
+
+let isaTrackChart = null;
+
+function renderISAChart(){
+  const labels = isaHistory.map(d=>d.m);
+  const vals = isaHistory.map(d=>d.v);
+  const pcts = vals.map((v,i)=> i===0 ? 0 : parseFloat(((v-vals[i-1])/vals[i-1]*100).toFixed(2)));
+
+  if(isaTrackChart) isaTrackChart.destroy();
+  isaTrackChart = new Chart(document.getElementById('isaTrack'),{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'ISA Value',data:vals,backgroundColor:'rgba(79,142,247,0.25)',borderColor:'#4f8ef7',borderWidth:1.5,borderRadius:4,yAxisID:'y',order:2},
+        {label:'% Change',data:pcts,type:'line',borderColor:'#34d17a',backgroundColor:'transparent',borderWidth:2,pointRadius:4,pointBackgroundColor:pcts.map(p=>p>=0?'#34d17a':'#f25c5c'),tension:.3,yAxisID:'y1',order:1}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{
+        label:ctx=> ctx.datasetIndex===0 ? ' £'+ctx.raw.toLocaleString('en-GB') : ' '+(ctx.raw>=0?'+':'')+ctx.raw+'%'
+      }}},
+      scales:{
+        x:{grid:{color:GC},ticks:{color:TC,autoSkip:false,maxRotation:0,font:{size:11}}},
+        y:{grid:{color:GC},ticks:{color:TC,callback:v=>'£'+(v/1000).toFixed(0)+'k'},position:'left'},
+        y1:{grid:{display:false},ticks:{color:TC,callback:v=>(v>=0?'+':'')+v+'%'},position:'right'}
+      }
+    }
+  });
+}
+renderISAChart();
+
+function addISAMonth(){
+  document.getElementById('isaMonthForm').style.display='block';
+  const now = new Date();
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('isa-month-inp').value = months[now.getMonth()]+' '+(now.getFullYear()+'').slice(2);
+}
+
+function saveISAMonth(){
+  const m = document.getElementById('isa-month-inp').value.trim();
+  const v = parseFloat(document.getElementById('isa-val-inp').value);
+  if(!m||isNaN(v)) return;
+  isaHistory.push({m,v});
+  localStorage.setItem('isaHistory', JSON.stringify(isaHistory));
+  document.getElementById('isaMonthForm').style.display='none';
+  renderISAChart();
+}
+
+</script>
+</body>
+</html>
