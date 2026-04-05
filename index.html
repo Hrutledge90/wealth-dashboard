@@ -113,6 +113,25 @@ body{background:#0c0f1a;color:#e8eaf0;font-family:system-ui,sans-serif;font-size
 </head>
 <body>
  
+<!-- PASSWORD GATE -->
+<div id="gate" style="position:fixed;inset:0;background:#0c0f1a;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#131726;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:40px 36px;max-width:380px;width:100%;text-align:center">
+    <div style="font-size:22px;font-weight:300;margin-bottom:6px"><span style="color:#4f8ef7">w</span>ealth.io</div>
+    <div style="font-size:11px;color:#5c6280;margin-bottom:28px;letter-spacing:.07em;text-transform:uppercase">Private — Mr &amp; Mrs X</div>
+    <input id="pwInput" type="password" placeholder="Enter password"
+      style="width:100%;background:#1a1f30;border:1px solid rgba(255,255,255,0.13);border-radius:8px;color:#e8eaf0;padding:12px 16px;font-size:14px;outline:none;font-family:inherit;text-align:center;letter-spacing:.1em;margin-bottom:12px"
+      onkeydown="if(event.key==='Enter')checkPW()">
+    <button onclick="checkPW()"
+      style="width:100%;background:#4f8ef7;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;cursor:pointer;font-weight:500;font-family:inherit">
+      Unlock dashboard
+    </button>
+    <div id="pwErr" style="display:none;font-size:12px;color:#f25c5c;margin-top:10px">Incorrect password — try again</div>
+    <div style="font-size:11px;color:#5c6280;margin-top:20px">Confidential financial data</div>
+  </div>
+</div>
+ 
+<div id="app" style="display:none">
+ 
 <div class="nav">
   <div class="nav-inner">
     <div class="logo"><span>w</span>ealth.io</div>
@@ -865,6 +884,50 @@ function handleFiles(input,chipId){
 }
  
  
+ 
+// PASSWORD GATE
+var PASSWORD_HASH = -97878208;
+function checkPW(){
+  var pw = document.getElementById('pwInput').value;
+  var hash = 0;
+  for(var i = 0; i < pw.length; i++){
+    hash = ((hash << 5) - hash) + pw.charCodeAt(i);
+    hash = hash | 0;
+  }
+  if(hash === PASSWORD_HASH){
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('pwErr').style.display = 'none';
+  } else {
+    document.getElementById('pwErr').style.display = 'block';
+    document.getElementById('pwInput').value = '';
+    document.getElementById('pwInput').focus();
+  }
+}
+document.getElementById('pwInput').focus();
 </script>
+</div><!-- end app -->
 </body>
 </html>
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
